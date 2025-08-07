@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Bomberos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles */
+        .blinking {
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0c2d6b 0%, #0a2452 50%, #081a3a 100%);
+        }
+        .emergency-card {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.1);
+        }
+        .emergency-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(239, 68, 68, 0.2);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+        }
+        .fire-animation {
+            position: relative;
+        }
+        .fire-animation::after {
+            content: "";
+            position: absolute;
+            top: -5px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #f97316, #ef4444, #f97316, transparent);
+            background-size: 200% 100%;
+            animation: fireGlow 2s linear infinite;
+            border-radius: 50%;
+        }
+        @keyframes fireGlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg text-gray-100 font-sans">
+    <!-- Login Overlay -->
+    <div id="loginOverlay" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-gray-800/90 p-8 rounded-xl w-full max-w-md border border-gray-700 shadow-2xl">
+            <div class="text-center mb-6">
+                <i class="fas fa-fire-extinguisher text-red-500 text-5xl mb-4"></i>
+                <h2 class="text-2xl font-bold">Acceso al Sistema</h2>
+                <p class="text-gray-400 mt-2">Ingrese sus credenciales</p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-300 mb-2 font-medium">Nombre completo</label>
+                <input type="text" id="usernameInput" class="w-full bg-gray-700/80 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Juan Pérez">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-300 mb-2 font-medium">N° de legajo</label>
+                <input type="text" id="legajoInput" class="w-full bg-gray-700/80 border border-gray-600 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: 12345">
+            </div>
+            <button id="loginBtn" class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-4 py-3 rounded-lg font-semibold transition-all shadow-lg">
+                <i class="fas fa-sign-in-alt mr-2"></i>Ingresar al sistema
+            </button>
+        </div>
+    </div>
+
+    <div class="container mx-auto px-4 py-6">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 py-4 border-b border-gray-700">
+            <div class="flex items-center mb-4 md:mb-0">
+                <div class="fire-animation mr-3">
+                    <i class="fas fa-fire text-4xl text-orange-500"></i>
+                </div>
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-500 bg-clip-text text-transparent">Bomberos de la Ciudad</h1>
+            </div>
+            
+            <div id="userInfo" class="hidden bg-gray-800/70 rounded-full px-4 py-2 border border-gray-700 flex items-center">
+                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mr-2">
+                    <i class="fas fa-user text-white text-sm"></i>
+                </div>
+                <div>
+                    <span class="text-gray-300 text-sm">Usuario:</span>
+                    <span id="usernameDisplay" class="font-semibold ml-1"></span>
+                    <div class="text-xs text-gray-400" id="legajoDisplay"></div>
+                </div>
+                <button id="logoutBtn" class="ml-3 text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
+                <button id="toggleTimerBtn" class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 px-6 py-2 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center">
+                    <i class="fas fa-play mr-2"></i>Iniciar servicio
+                </button>
+                <button id="toggleViewBtn" class="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-6 py-2 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center">
+                    <i class="fas fa-exchange-alt mr-2"></i>Modo emergencias
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Timer Dashboard -->
+            <div id="timerView" class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg mb-8 border border-gray-700">
+                <div class="flex flex-col lg:flex-row justify-between items-center mb-8 gap-6">
+                    <div class="text-center lg:text-left">
+                        <h2 class="text-2xl font-bold mb-2 flex items-center justify-center lg:justify-start">
+                            <i class="fas fa-clock text-blue-400 mr-2"></i>Tiempo de Servicio
+                        </h2>
+                        <p class="text-gray-400 max-w-md">Registro de horas trabajadas y control de guardias activas</p>
+                    </div>
+                    <div class="text-center w-full lg:w-auto">
+                        <div id="timerDisplay" class="text-5xl md:text-6xl font-mono font-bold mb-4 bg-gray-900/50 px-6 py-3 rounded-lg border border-gray-700 blinking">
+                            00:00:00
+                        </div>
+                        <div class="flex justify-center gap-3">
+                            <button id="pauseBtn" class="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 rounded-lg font-medium hidden transition-colors shadow">
+                                <i class="fas fa-pause mr-2"></i>Pausar
+                            </button>
+                            <button id="endShiftBtn" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-medium hidden transition-colors shadow">
+                                <i class="fas fa-stop mr-2"></i>Finalizar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-900/40 rounded-lg p-4 border border-gray-700">
+                    <h3 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-history mr-2 text-blue-400"></i>Historial de Guardias
+                    </h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-700 text-left">
+                                    <th class="py-3 px-4">Nombre</th>
+                                    <th class="py-3 px-4">Fecha</th>
+                                    <th class="py-3 px-4">Inicio</th>
+                                    <th class="py-3 px-4">Fin</th>
+                                    <th class="py-3 px-4">Duración</th>
+                                </tr>
+                            </thead>
+                            <tbody id="shiftHistory" class="divide-y divide-gray-700">
+                                <tr class="hover:bg-gray-800/50">
+                                    <td colspan="5" class="py-4 text-center text-gray-500 italic">No hay registros de servicio</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Call Log Dashboard -->
+            <div id="callLogView" class="bg-gray-800/50 backdrop-blur-sm rounded-xl p-6 shadow-lg hidden border border-gray-700">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center">
+                            <i class="fas fa-phone-alt text-red-500 mr-2"></i>Registro de Emergencias
+                        </h2>
+                        <p class="text-gray-400 mt-1">Sistema de gestión de llamadas al 911</p>
+                    </div>
+                    <button id="newCallBtn" class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 px-4 py-2 rounded-lg font-medium shadow flex items-center">
+                        <i class="fas fa-plus mr-2"></i>Nueva Emergencia
+                    </button>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gray-900/40 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-full bg-red-500/20 mr-3">
+                                <i class="fas fa-fire text-red-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 text-sm">Incendios</div>
+                                <div class="font-bold text-xl" id="fireCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/40 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-full bg-blue-500/20 mr-3">
+                                <i class="fas fa-ambulance text-blue-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 text-sm">Médicas</div>
+                                <div class="font-bold text-xl" id="medicalCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/40 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-full bg-yellow-500/20 mr-3">
+                                <i class="fas fa-life-ring text-yellow-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 text-sm">Rescates</div>
+                                <div class="font-bold text-xl" id="rescueCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-900/40 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-full bg-purple-500/20 mr-3">
+                                <i class="fas fa-biohazard text-purple-400"></i>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 text-sm">Materiales</div>
+                                <div class="font-bold text-xl" id="hazmatCount">0</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Call Log Table -->
+                <div class="bg-gray-900/40 rounded-lg p-4 mb-6 border border-gray-700">
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left border-b border-gray-700">
+                                    <th class="py-3 px-4">ID</th>
+                                    <th class="py-3 px-4">Hora</th>
+                                    <th class="py-3 px-4">Ubicación</th>
+                                    <th class="py-3 px-4">Tipo</th>
+                                    <th class="py-3 px-4">Prioridad</th>
+                                    <th class="py-3 px-4">Estado</th>
+                                    <th class="py-3 px-4">Jefe Dotación</th>
+                                    <th class="py-3 px-4">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="callLogTable" class="divide-y divide-gray-700">
+                                <tr class="hover:bg-gray-800/50">
+                                    <td colspan="7" class="py-4 text-center text-gray-500 italic">No hay registros de emergencias</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Call Details Section -->
+                <div id="callDetails" class="bg-gray-900/40 rounded-lg p-6 hidden border border-gray-700">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-semibold flex items-center">
+                            <i class="fas fa-file-alt mr-2 text-blue-400"></i>
+                            <span id="callFormTitle">Nueva Emergencia</span>
+                        </h3>
+                        <div class="flex gap-2">
+                            <button id="cancelCallBtn" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg font-medium transition-colors">
+                                <i class="fas fa-times mr-2"></i>Cancelar
+                            </button>
+                            <button id="saveCallBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition-colors">
+                                <i class="fas fa-save mr-2"></i>Guardar
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Nombre del denunciante</label>
+                                <input type="text" id="callerName" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Teléfono</label>
+                                <input type="text" id="callerPhone" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Ubicación exacta</label>
+                                <input type="text" id="callLocation" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Tipo de emergencia</label>
+                                <select id="callType" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="Fire">Incendio</option>
+                                    <option value="Medical">Emergencia médica</option>
+                                    <option value="Rescue">Rescate</option>
+                                    <option value="Hazardous Material">Material peligroso</option>
+                                    <option value="Other">Otro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Prioridad</label>
+                                <select id="callPriority" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="Low">Baja</option>
+                                    <option value="Medium">Media</option>
+                                    <option value="High" selected>Alta</option>
+                                    <option value="Emergency">Emergencia</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Estado</label>
+                                <select id="callStatus" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="Pending">Pendiente</option>
+                                    <option value="Dispatched">En camino</option>
+                                    <option value="On Scene">En el lugar</option>
+                                    <option value="Resolved">Resuelto</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-gray-300 mb-2 font-medium">Jefe de Dotación</label>
+                                <input type="text" id="staffingManager" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre del jefe de dotación">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-gray-300 mb-2 font-medium">Descripción de la emergencia</label>
+                        <textarea id="callDescription" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-300 mb-2 font-medium">Notas y acciones tomadas</label>
+                        <textarea id="callResponse" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="mt-12 pt-6 border-t border-gray-700 text-center text-gray-500 text-sm">
+            <p class="mb-2">
+                <span class="text-gray-400">Sistema de Bomberos</span> © 2025 | 
+                <span class="text-blue-400">Versión 2.0</span>
+            </p>
+            <p>
+                Desarrollado por <span class="text-orange-400">Cabo 1° Fabricio Caseres</span> 
+                <i class="fas fa-heart text-red-500 mx-1"></i> 
+                Para los bomberos de la ciudad
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Login Elements
+        const loginOverlay = document.getElementById('loginOverlay');
+        const usernameInput = document.getElementById('usernameInput');
+        const legajoInput = document.getElementById('legajoInput');
+        const loginBtn = document.getElementById('loginBtn');
+        const userInfo = document.getElementById('userInfo');
+        const usernameDisplay = document.getElementById('usernameDisplay');
+        const legajoDisplay = document.getElementById('legajoDisplay');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // DOM Elements
+        const toggleTimerBtn = document.getElementById('toggleTimerBtn');
+        const toggleViewBtn = document.getElementById('toggleViewBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const endShiftBtn = document.getElementById('endShiftBtn');
+        const shiftHistory = document.getElementById('shiftHistory');
+        const timerView = document.getElementById('timerView');
+        const callLogView = document.getElementById('callLogView');
+        const newCallBtn = document.getElementById('newCallBtn');
+        const callLogTable = document.getElementById('callLogTable');
+        const callDetails = document.getElementById('callDetails');
+        const saveCallBtn = document.getElementById('saveCallBtn');
+        const cancelCallBtn = document.getElementById('cancelCallBtn');
+        const callFormTitle = document.getElementById('callFormTitle');
+
+        // Stats elements
+        const fireCount = document.getElementById('fireCount');
+        const medicalCount = document.getElementById('medicalCount');
+        const rescueCount = document.getElementById('rescueCount');
+        const hazmatCount = document.getElementById('hazmatCount');
+
+        // Timer Variables
+        let timerInterval;
+        let seconds = 0;
+        let isRunning = false;
+        let isPaused = false;
+        let currentShiftStart = null;
+        let editingCallId = null;
+
+        // Shift History Data
+        let shifts = JSON.parse(localStorage.getItem('shifts')) || [];
+
+        // Call Log Data
+        let calls = JSON.parse(localStorage.getItem('calls')) || [];
+
+        // User Management
+        function checkLogin() {
+            const username = localStorage.getItem('firefighterUsername');
+            const legajo = localStorage.getItem('firefighterLegajo');
+            
+            if (username && legajo) {
+                loginOverlay.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                usernameDisplay.textContent = username;
+                legajoDisplay.textContent = `Legajo: ${legajo}`;
+            } else {
+                loginOverlay.classList.remove('hidden');
+            }
+        }
+
+        function login() {
+            const username = usernameInput.value.trim();
+            const legajo = legajoInput.value.trim();
+            
+            if (username && legajo) {
+                localStorage.setItem('firefighterUsername', username);
+                localStorage.setItem('firefighterLegajo', legajo);
+                checkLogin();
+            } else {
+                alert('Por favor complete ambos campos');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('firefighterUsername');
+            localStorage.removeItem('firefighterLegajo');
+            loginOverlay.classList.remove('hidden');
+            userInfo.classList.add('hidden');
+            usernameInput.value = '';
+            legajoInput.value = '';
+            
+            // Stop timer if running
+            if (isRunning) {
+                endShift();
+            }
+        }
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            checkLogin();
+            updateShiftHistory();
+            updateCallLogTable();
+            updateStats();
+        });
+
+        // Event Listeners for login
+        loginBtn.addEventListener('click', login);
+        logoutBtn.addEventListener('click', logout);
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        legajoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+
+        // Timer Functions
+        function startTimer() {
+            if (!isRunning) {
+                currentShiftStart = new Date();
+                isRunning = true;
+                timerInterval = setInterval(updateTimer, 1000);
+                
+                toggleTimerBtn.innerHTML = '<i class="fas fa-running mr-2"></i>Servicio activo';
+                toggleTimerBtn.classList.remove('from-red-600', 'to-red-700', 'hover:from-red-700', 'hover:to-red-800');
+                toggleTimerBtn.classList.add('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                
+                pauseBtn.classList.remove('hidden');
+                endShiftBtn.classList.remove('hidden');
+                timerDisplay.classList.add('blinking');
+                
+                // Notification
+                showNotification('Servicio iniciado', 'green');
+            }
+        }
+
+        function pauseTimer() {
+            if (isRunning && !isPaused) {
+                clearInterval(timerInterval);
+                isPaused = true;
+                pauseBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Continuar';
+                timerDisplay.classList.remove('blinking');
+                showNotification('Servicio en pausa', 'yellow');
+            } else if (isRunning && isPaused) {
+                timerInterval = setInterval(updateTimer, 1000);
+                isPaused = false;
+                pauseBtn.innerHTML = '<i class="fas fa-pause mr-2"></i>Pausar';
+                timerDisplay.classList.add('blinking');
+                showNotification('Servicio reanudado', 'green');
+            }
+        }
+
+        function endShift() {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                isPaused = false;
+
+                // Save the shift
+                const shiftEnd = new Date();
+                const shiftDuration = formatTime(seconds);
+
+                const shift = {
+                    id: Date.now(),
+                    username: localStorage.getItem('firefighterUsername'),
+                    legajo: localStorage.getItem('firefighterLegajo'),
+                    date: currentShiftStart.toLocaleDateString('es-AR'),
+                    startTime: currentShiftStart.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'}),
+                    endTime: shiftEnd.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'}),
+                    duration: shiftDuration
+                };
+
+                shifts.push(shift);
+                localStorage.setItem('shifts', JSON.stringify(shifts));
+
+                // Reset UI
+                toggleTimerBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Iniciar servicio';
+                toggleTimerBtn.classList.remove('from-green-600', 'to-green-700', 'hover:from-green-700', 'hover:to-green-800');
+                toggleTimerBtn.classList.add('from-red-600', 'to-red-700', 'hover:from-red-700', 'hover:to-red-800');
+                
+                pauseBtn.classList.add('hidden');
+                endShiftBtn.classList.add('hidden');
+                timerDisplay.classList.remove('blinking');
+
+                seconds = 0;
+                timerDisplay.textContent = '00:00:00';
+
+                updateShiftHistory();
+                showNotification('Servicio finalizado', 'blue');
+            }
+        }
+
+        function updateTimer() {
+            seconds++;
+            timerDisplay.textContent = formatTime(seconds);
+        }
+
+        function formatTime(totalSeconds) {
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            return [
+                hours.toString().padStart(2, '0'),
+                minutes.toString().padStart(2, '0'),
+                seconds.toString().padStart(2, '0')
+            ].join(':');
+        }
+
+        function updateShiftHistory() {
+            if (shifts.length === 0) {
+                shiftHistory.innerHTML = `
+                    <tr class="hover:bg-gray-800/50">
+                        <td colspan="5" class="py-4 text-center text-gray-500 italic">No hay registros de servicio</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            // Filter shifts for current user
+            const userShifts = shifts.filter(shift => 
+                shift.legajo === localStorage.getItem('firefighterLegajo')
+            ).reverse();
+
+            if (userShifts.length === 0) {
+                shiftHistory.innerHTML = `
+                    <tr class="hover:bg-gray-800/50">
+                        <td colspan="5" class="py-4 text-center text-gray-500 italic">No hay registros de servicio</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            shiftHistory.innerHTML = userShifts.map(shift => `
+                <tr class="hover:bg-gray-800/50">
+                    <td class="py-3 px-4">${shift.username}</td>
+                    <td class="py-3 px-4">${shift.date}</td>
+                    <td class="py-3 px-4">${shift.startTime}</td>
+                    <td class="py-3 px-4">${shift.endTime}</td>
+                    <td class="py-3 px-4 font-mono">${shift.duration}</td>
+                </tr>
+            `).join('');
+        }
+
+        // Call Log Functions
+        function updateCallLogTable() {
+            if (calls.length === 0) {
+                callLogTable.innerHTML = `
+                    <tr class="hover:bg-gray-800/50">
+                        <td colspan="7" class="py-4 text-center text-gray-500 italic">No hay registros de emergencias</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            callLogTable.innerHTML = calls.slice().reverse().map(call => `
+                <tr class="hover:bg-gray-800/50">
+                    <td class="py-3 px-4 font-mono">${call.id.toString().slice(-4)}</td>
+                    <td class="py-3 px-4">${call.time}</td>
+                    <td class="py-3 px-4">${call.location}</td>
+                    <td class="py-3 px-4">
+                        <span class="inline-flex items-center">
+                            ${getCallTypeIcon(call.type)} ${call.type === 'Fire' ? 'Incendio' : 
+                              call.type === 'Medical' ? 'Médica' : 
+                              call.type === 'Rescue' ? 'Rescate' : 
+                              call.type === 'Hazardous Material' ? 'Material' : 'Otro'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        ${call.priority === 'Low' ? 'Baja' : 
+                          call.priority === 'Medium' ? 'Media' : 
+                          call.priority === 'High' ? 'Alta' : 'Emergencia'}
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="status-badge ${getStatusClass(call.status)}">
+                            ${call.status === 'Pending' ? 'Pendiente' : 
+                              call.status === 'Dispatched' ? 'En camino' : 
+                              call.status === 'On Scene' ? 'En lugar' : 'Resuelto'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">${call.staffingManager || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <div class="flex gap-2">
+                            <button onclick="editCall(${call.id})" class="text-blue-400 hover:text-blue-300 transition-colors" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteCall(${call.id})" class="text-red-400 hover:text-red-300 transition-colors" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getCallTypeIcon(type) {
+            switch(type) {
+                case 'Fire': return '<i class="fas fa-fire text-red-500 mr-1"></i>';
+                case 'Medical': return '<i class="fas fa-ambulance text-blue-500 mr-1"></i>';
+                case 'Rescue': return '<i class="fas fa-life-ring text-yellow-500 mr-1"></i>';
+                case 'Hazardous Material': return '<i class="fas fa-biohazard text-purple-500 mr-1"></i>';
+                default: return '<i class="fas fa-question-circle text-gray-400 mr-1"></i>';
+            }
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'Pending': return 'bg-yellow-600/30 text-yellow-400';
+                case 'Dispatched': return 'bg-blue-600/30 text-blue-400';
+                case 'On Scene': return 'bg-orange-600/30 text-orange-400';
+                case 'Resolved': return 'bg-green-600/30 text-green-400';
+                default: return 'bg-gray-600/30 text-gray-400';
+            }
+        }
+
+        function updateStats() {
+            fireCount.textContent = calls.filter(c => c.type === 'Fire').length;
+            medicalCount.textContent = calls.filter(c => c.type === 'Medical').length;
+            rescueCount.textContent = calls.filter(c => c.type === 'Rescue').length;
+            hazmatCount.textContent = calls.filter(c => c.type === 'Hazardous Material').length;
+        }
+
+        function editCall(id) {
+            const call = calls.find(c => c.id === id);
+            if (!call) return;
+
+            editingCallId = id;
+            callFormTitle.textContent = `Editar Emergencia #${id.toString().slice(-4)}`;
+
+            // Fill the form
+            document.getElementById('callerName').value = call.callerName || '';
+            document.getElementById('callerPhone').value = call.callerPhone || '';
+            document.getElementById('callLocation').value = call.location || '';
+            document.getElementById('callType').value = call.type || 'Fire';
+            document.getElementById('callPriority').value = call.priority || 'High';
+            document.getElementById('callStatus').value = call.status || 'Pending';
+            document.getElementById('callDescription').value = call.description || '';
+            document.getElementById('callResponse').value = call.response || '';
+            document.getElementById('staffingManager').value = call.staffingManager || '';
+
+            // Show the form
+            callDetails.classList.remove('hidden');
+            callLogTable.parentElement.classList.add('hidden');
+            newCallBtn.classList.add('hidden');
+        }
+
+        function deleteCall(id) {
+            if (confirm('¿Está seguro que desea eliminar esta emergencia?')) {
+                calls = calls.filter(c => c.id !== id);
+                localStorage.setItem('calls', JSON.stringify(calls));
+                updateCallLogTable();
+                updateStats();
+                showNotification('Emergencia eliminada', 'red');
+            }
+        }
+
+        function saveCall() {
+            const callerName = document.getElementById('callerName').value.trim();
+            const callerPhone = document.getElementById('callerPhone').value.trim();
+            const location = document.getElementById('callLocation').value.trim();
+            const type = document.getElementById('callType').value;
+            const priority = document.getElementById('callPriority').value;
+            const status = document.getElementById('callStatus').value;
+            const description = document.getElementById('callDescription').value.trim();
+            const response = document.getElementById('callResponse').value.trim();
+            const staffingManager = document.getElementById('staffingManager').value.trim();
+
+            if (!callerName || !location || !description) {
+                showNotification('Complete los campos requeridos', 'red');
+                return;
+            }
+
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('es-AR', {hour: '2-digit', minute:'2-digit'});
+
+            if (editingCallId) {
+                // Update existing call
+                const index = calls.findIndex(c => c.id === editingCallId);
+                if (index !== -1) {
+                    calls[index] = {
+                        ...calls[index],
+                        callerName,
+                        callerPhone,
+                        location,
+                        type,
+                        priority,
+                        status,
+                        description,
+                        response,
+                        time: timeString
+                    };
+                }
+                showNotification('Emergencia actualizada', 'blue');
+            } else {
+                // Create new call
+                const newCall = {
+                    id: Date.now(),
+                    time: timeString,
+                    callerName,
+                    callerPhone,
+                    location,
+                    type,
+                    priority,
+                    status,
+                    description,
+                    response,
+                    loggedBy: localStorage.getItem('firefighterUsername'),
+                    legajo: localStorage.getItem('firefighterLegajo'),
+                    staffingManager: staffingManager
+                };
+                calls.push(newCall);
+                showNotification('Nueva emergencia registrada', 'green');
+            }
+
+            localStorage.setItem('calls', JSON.stringify(calls));
+            resetCallForm();
+            updateCallLogTable();
+            updateStats();
+        }
+
+        function resetCallForm() {
+            document.getElementById('callerName').value = '';
+            document.getElementById('callerPhone').value = '';
+            document.getElementById('callLocation').value = '';
+            document.getElementById('callType').value = 'Fire';
+            document.getElementById('callPriority').value = 'High';
+            document.getElementById('callStatus').value = 'Pending';
+            document.getElementById('callDescription').value = '';
+            document.getElementById('callResponse').value = '';
+            document.getElementById('staffingManager').value = '';
+
+            callDetails.classList.add('hidden');
+            callLogTable.parentElement.classList.remove('hidden');
+            newCallBtn.classList.remove('hidden');
+            editingCallId = null;
+            callFormTitle.textContent = 'Nueva Emergencia';
+        }
+
+        function showNotification(message, color) {
+            const notification = document.createElement('div');
+            notification.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg flex items-center ${color === 'green' ? 'bg-green-600' : 
+                                      color === 'red' ? 'bg-red-600' : 
+                                      color === 'blue' ? 'bg-blue-600' : 'bg-yellow-600'}`;
+            
+            notification.innerHTML = `
+                <i class="fas ${color === 'green' ? 'fa-check-circle' : 
+                               color === 'red' ? 'fa-exclamation-circle' : 
+                               color === 'blue' ? 'fa-info-circle' : 'fa-exclamation-triangle'} mr-2"></i>
+                ${message}
+            `;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Event Listeners
+        toggleTimerBtn.addEventListener('click', startTimer);
+        pauseBtn.addEventListener('click', pauseTimer);
+        endShiftBtn.addEventListener('click', endShift);
+
+        toggleViewBtn.addEventListener('click', () => {
+            timerView.classList.toggle('hidden');
+            callLogView.classList.toggle('hidden');
+
+            if (callLogView.classList.contains('hidden')) {
+                toggleViewBtn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Modo emergencias';
+            } else {
+                toggleViewBtn.innerHTML = '<i class="fas fa-exchange-alt mr-2"></i>Modo servicio';
+            }
+        });
+
+        newCallBtn.addEventListener('click', () => {
+            resetCallForm();
+            callDetails.classList.remove('hidden');
+            callLogTable.parentElement.classList.add('hidden');
+            newCallBtn.classList.add('hidden');
+        });
+
+        saveCallBtn.addEventListener('click', saveCall);
+        cancelCallBtn.addEventListener('click', resetCallForm);
+
+        // Make functions available globally for the inline event handlers in the table
+        window.editCall = editCall;
+        window.deleteCall = deleteCall;
+    </script>
+</body>
+</html>
